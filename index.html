@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1"
     />
-    <title>Simple PDF Text Editor</title>
+    <title>PDF Reconstruction Editor</title>
     <style>
       :root {
         color-scheme: light;
@@ -70,6 +70,40 @@
         box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
       }
 
+      .control-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #ffffff;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .toggle input {
+        accent-color: var(--accent);
+      }
+
+      .select {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 8px;
+        background: #ffffff;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
       .btn,
       .file-button {
         display: inline-flex;
@@ -126,6 +160,29 @@
         background: #fef2f2;
       }
 
+      .barcodes {
+        margin-top: 16px;
+        padding: 12px 16px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      .barcodes h2 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+
+      .barcode-list {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .barcode-list li {
+        margin-bottom: 6px;
+      }
+
       .pages {
         margin-top: 20px;
         display: flex;
@@ -156,6 +213,7 @@
         position: absolute;
         inset: 0;
         pointer-events: none;
+        z-index: 2;
       }
 
       .text-layer span {
@@ -181,6 +239,33 @@
         color: #0f172a;
         background: rgba(255, 255, 255, 0.95);
         box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.6);
+      }
+
+      .barcode-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 3;
+      }
+
+      .barcode-box {
+        position: absolute;
+        border: 2px dashed #22c55e;
+        border-radius: 8px;
+        background: rgba(34, 197, 94, 0.08);
+      }
+
+      .barcode-label {
+        position: absolute;
+        top: -22px;
+        left: 0;
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: rgba(240, 253, 244, 0.95);
+        color: #166534;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
       }
 
       .notes {
@@ -212,6 +297,10 @@
           align-items: stretch;
         }
 
+        .control-group {
+          justify-content: center;
+        }
+
         .btn,
         .file-button {
           justify-content: center;
@@ -222,53 +311,85 @@
   <body>
     <header>
       <div class="header-content">
-        <h1>PDF Text Editor</h1>
-        <p>Upload a PDF, edit its text, and download a new copy.</p>
+        <h1>PDF Reconstruction Editor</h1>
+        <p>
+          Upload a PDF, rebuild every page, and edit text seamlessly before
+          downloading.
+        </p>
       </div>
     </header>
 
     <main>
       <section class="controls">
-        <label class="file-button" for="fileInput">
-          Select PDF
-          <input id="fileInput" type="file" accept="application/pdf" />
-        </label>
-        <button
-          class="btn secondary"
-          type="button"
-          id="addTextBtn"
-          aria-pressed="false"
-          disabled
-        >
-          Add Text
-        </button>
-        <button class="btn" type="button" id="downloadBtn" disabled>
-          Download Edited PDF
-        </button>
-        <button class="btn secondary" type="button" id="clearBtn" disabled>
-          Clear
-        </button>
+        <div class="control-group">
+          <label class="file-button" for="fileInput">
+            Select PDF
+            <input id="fileInput" type="file" accept="application/pdf" />
+          </label>
+          <button
+            class="btn secondary"
+            type="button"
+            id="addTextBtn"
+            aria-pressed="false"
+            disabled
+          >
+            Add Text
+          </button>
+          <button class="btn" type="button" id="downloadBtn" disabled>
+            Download Rebuilt PDF
+          </button>
+          <button class="btn secondary" type="button" id="clearBtn" disabled>
+            Clear
+          </button>
+        </div>
+        <div class="control-group" aria-label="Rebuild options">
+          <label class="toggle" for="ocrMode">
+            OCR
+            <select id="ocrMode" class="select">
+              <option value="auto" selected>Auto (scans only)</option>
+              <option value="always">Always</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <label class="toggle" for="barcodeToggle">
+            <input id="barcodeToggle" type="checkbox" checked />
+            Detect barcodes
+          </label>
+          <label class="toggle" for="rewriteToggle">
+            <input id="rewriteToggle" type="checkbox" checked />
+            Rewrite all detected text
+          </label>
+        </div>
       </section>
 
       <p id="status" class="status" role="status" aria-live="polite">
-        Upload a PDF to begin.
+        Upload a PDF to rebuild it.
       </p>
 
       <section id="pages" class="pages" aria-live="polite"></section>
+
+      <section id="barcodeSection" class="barcodes" hidden>
+        <h2>Detected barcodes</h2>
+        <ul id="barcodeList" class="barcode-list"></ul>
+      </section>
 
       <section class="notes">
         <h2>Tips</h2>
         <ul>
           <li>Click on any text to edit it. Press Enter to save.</li>
           <li>Use Add Text to place new text on a page.</li>
-          <li>Edits are flattened into the downloaded PDF.</li>
-          <li>Scanned PDFs (images) cannot be edited.</li>
+          <li>Pages are rebuilt by redrawing detected text on top of each page.</li>
+          <li>OCR helps turn scanned pages into editable text layers.</li>
+          <li>Barcode detection is optional and highlights found codes.</li>
+          <li>Exports are rasterized for pixel-perfect layout.</li>
         </ul>
       </section>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@latest/legacy/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@latest/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@latest/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script>
       const fileInput = document.getElementById("fileInput");
       const pagesContainer = document.getElementById("pages");
@@ -276,6 +397,11 @@
       const clearBtn = document.getElementById("clearBtn");
       const addTextBtn = document.getElementById("addTextBtn");
       const statusEl = document.getElementById("status");
+      const ocrModeSelect = document.getElementById("ocrMode");
+      const barcodeToggle = document.getElementById("barcodeToggle");
+      const rewriteToggle = document.getElementById("rewriteToggle");
+      const barcodeSection = document.getElementById("barcodeSection");
+      const barcodeList = document.getElementById("barcodeList");
 
       const workerSrc =
         "https://cdn.jsdelivr.net/npm/pdfjs-dist@latest/legacy/build/pdf.worker.min.js";
@@ -284,9 +410,18 @@
       const state = {
         pdf: null,
         pages: [],
-        fileName: "edited.pdf",
+        fileName: "rebuilt.pdf",
         addMode: false,
         scale: 1.4,
+        ocrWorker: null,
+        ocrMode: "auto",
+        barcodeEnabled: true,
+        rewriteAll: true,
+        barcodeReader: null,
+        barcodes: [],
+        loadId: 0,
+        isBusy: false,
+        ocrProgressLabel: "",
       };
 
       function setStatus(message, isError = false) {
@@ -294,24 +429,156 @@
         statusEl.classList.toggle("status-error", isError);
       }
 
+      function syncSettings() {
+        state.ocrMode = ocrModeSelect.value;
+        state.barcodeEnabled = barcodeToggle.checked;
+        state.rewriteAll = rewriteToggle.checked;
+      }
+
+      function setBusy(isBusy) {
+        state.isBusy = isBusy;
+        setButtons();
+      }
+
       function setButtons() {
         const hasPdf = state.pages.length > 0;
-        downloadBtn.disabled = !hasPdf;
-        clearBtn.disabled = !hasPdf;
-        addTextBtn.disabled = !hasPdf;
+        downloadBtn.disabled = !hasPdf || state.isBusy;
+        clearBtn.disabled = !hasPdf || state.isBusy;
+        addTextBtn.disabled = !hasPdf || state.isBusy;
+        fileInput.disabled = state.isBusy;
+        ocrModeSelect.disabled = state.isBusy;
+        barcodeToggle.disabled = state.isBusy;
+        rewriteToggle.disabled = state.isBusy;
+      }
+
+      function resetBarcodeList() {
+        state.barcodes = [];
+        barcodeList.innerHTML = "";
+        barcodeSection.hidden = true;
+      }
+
+      function normalizeColor(color) {
+        if (!color) {
+          return "#111111";
+        }
+        if (color === "transparent") {
+          return "#111111";
+        }
+        if (color.startsWith("rgba")) {
+          const parts = color
+            .replace("rgba(", "")
+            .replace(")", "")
+            .split(",");
+          const alpha = parseFloat(parts[3]);
+          if (!Number.isNaN(alpha) && alpha === 0) {
+            return "#111111";
+          }
+        }
+        return color;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function parseTransform(transform) {
+        if (!transform || transform === "none") {
+          return null;
+        }
+        const MatrixCtor = window.DOMMatrixReadOnly || window.DOMMatrix;
+        if (!MatrixCtor) {
+          return null;
+        }
+        try {
+          return new MatrixCtor(transform);
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function getLineHeight(style, fontSize) {
+        const lineHeight = style.lineHeight;
+        if (!lineHeight || lineHeight === "normal") {
+          return fontSize * 1.2;
+        }
+        const parsed = parseFloat(lineHeight);
+        return Number.isFinite(parsed) ? parsed : fontSize * 1.2;
+      }
+
+      function getRelativeRect(div, layerRect) {
+        const rect = div.getBoundingClientRect();
+        return {
+          x: rect.left - layerRect.left,
+          y: rect.top - layerRect.top,
+          width: rect.width,
+          height: rect.height,
+        };
+      }
+
+      function getElementOrigin(div, layerRect) {
+        const left = parseFloat(div.style.left);
+        const top = parseFloat(div.style.top);
+        if (Number.isFinite(left) && Number.isFinite(top)) {
+          return { x: left, y: top };
+        }
+        const rect = div.getBoundingClientRect();
+        return {
+          x: rect.left - layerRect.left,
+          y: rect.top - layerRect.top,
+        };
+      }
+
+      function sampleBackgroundColor(baseCtx, rect, canvas) {
+        const padding = 2;
+        const points = [
+          { x: rect.x - padding, y: rect.y - padding },
+          { x: rect.x + rect.width + padding, y: rect.y - padding },
+          { x: rect.x - padding, y: rect.y + rect.height + padding },
+          {
+            x: rect.x + rect.width + padding,
+            y: rect.y + rect.height + padding,
+          },
+          { x: rect.x + rect.width / 2, y: rect.y - padding },
+          { x: rect.x + rect.width / 2, y: rect.y + rect.height + padding },
+        ];
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let count = 0;
+        points.forEach((point) => {
+          const x = clamp(Math.round(point.x), 0, canvas.width - 1);
+          const y = clamp(Math.round(point.y), 0, canvas.height - 1);
+          const data = baseCtx.getImageData(x, y, 1, 1).data;
+          if (data[3] === 0) {
+            return;
+          }
+          r += data[0];
+          g += data[1];
+          b += data[2];
+          count += 1;
+        });
+        if (!count) {
+          return "#ffffff";
+        }
+        return `rgb(${Math.round(r / count)}, ${Math.round(
+          g / count
+        )}, ${Math.round(b / count)})`;
       }
 
       function resetEditor() {
         pagesContainer.innerHTML = "";
         state.pdf = null;
         state.pages = [];
-        state.fileName = "edited.pdf";
+        state.fileName = "rebuilt.pdf";
         state.addMode = false;
+        state.isBusy = false;
+        state.ocrProgressLabel = "";
         addTextBtn.textContent = "Add Text";
         addTextBtn.setAttribute("aria-pressed", "false");
         fileInput.value = "";
+        resetBarcodeList();
         setButtons();
-        setStatus("Upload a PDF to begin.");
+        setStatus("Upload a PDF to rebuild it.");
       }
 
       function toggleAddMode() {
@@ -335,11 +602,23 @@
       }
 
       function setupEditable(div) {
+        if (!div.dataset.originalText) {
+          div.dataset.originalText = div.textContent || "";
+        }
+        if (!div.dataset.originalColor) {
+          if (div.isConnected) {
+            const computed = window.getComputedStyle(div);
+            div.dataset.originalColor = normalizeColor(computed.color);
+          } else {
+            div.dataset.originalColor = "#111111";
+          }
+        }
         div.classList.add("editable-text");
         div.contentEditable = "true";
         div.spellcheck = false;
-        div.dataset.originalText = div.textContent || "";
-        div.dataset.edited = "false";
+        if (!div.dataset.edited) {
+          div.dataset.edited = "false";
+        }
         div.addEventListener("input", () => updateEditedState(div));
         div.addEventListener("blur", () => updateEditedState(div));
         div.addEventListener("keydown", (event) => {
@@ -365,9 +644,11 @@
         div.style.top = `${y}px`;
         div.style.fontSize = "16px";
         div.style.fontFamily = "Helvetica, Arial, sans-serif";
+        div.dataset.originalColor = "#111111";
         div.dataset.originalText = "";
         div.dataset.edited = "true";
         div.dataset.isNew = "true";
+        div.dataset.source = "new";
         setupEditable(div);
         div.classList.add("edited");
         textLayer.appendChild(div);
@@ -378,7 +659,221 @@
         return div;
       }
 
-      async function renderPage(pageNumber) {
+      async function ensureOcrWorker() {
+        if (state.ocrWorker) {
+          return state.ocrWorker;
+        }
+        if (!window.Tesseract || !window.Tesseract.createWorker) {
+          throw new Error("OCR engine is unavailable.");
+        }
+        setStatus("Loading OCR engine...");
+        const worker = await window.Tesseract.createWorker({
+          logger: (info) => {
+            if (
+              info.status === "recognizing text" &&
+              state.ocrProgressLabel
+            ) {
+              const pct = Math.round(info.progress * 100);
+              setStatus(`${state.ocrProgressLabel} ${pct}%`);
+            }
+          },
+        });
+        await worker.loadLanguage("eng");
+        await worker.initialize("eng");
+        state.ocrWorker = worker;
+        return worker;
+      }
+
+      function createOcrSpan(line, textLayer) {
+        const text = (line.text || "").trim();
+        if (!text) {
+          return null;
+        }
+        const bbox = line.bbox;
+        const height = Math.max(1, bbox.y1 - bbox.y0);
+        const div = document.createElement("span");
+        div.textContent = text;
+        div.style.left = `${bbox.x0}px`;
+        div.style.top = `${bbox.y0}px`;
+        div.style.fontSize = `${Math.max(10, height * 0.85)}px`;
+        div.style.fontFamily = "Helvetica, Arial, sans-serif";
+        div.dataset.originalText = text;
+        div.dataset.originalColor = "#111111";
+        div.dataset.isOcr = "true";
+        div.dataset.source = "ocr";
+        textLayer.appendChild(div);
+        setupEditable(div);
+        return div;
+      }
+
+      async function runOcrOnPage(pageView, pageNumber, loadId) {
+        if (state.ocrMode === "off") {
+          return [];
+        }
+        let worker;
+        try {
+          state.ocrProgressLabel = `OCR page ${pageNumber}/${state.pdf.numPages}:`;
+          worker = await ensureOcrWorker();
+        } catch (error) {
+          console.error(error);
+          setStatus("OCR engine failed to load.", true);
+          state.ocrProgressLabel = "";
+          return [];
+        }
+
+        const result = await worker.recognize(pageView.canvas);
+        state.ocrProgressLabel = "";
+        if (state.loadId !== loadId) {
+          return [];
+        }
+
+        const lines = result.data?.lines || [];
+        const minConfidence = 30;
+        const ocrDivs = [];
+        lines.forEach((line) => {
+          if (
+            typeof line.confidence === "number" &&
+            line.confidence < minConfidence
+          ) {
+            return;
+          }
+          const div = createOcrSpan(line, pageView.textLayer);
+          if (div) {
+            ocrDivs.push(div);
+          }
+        });
+        return ocrDivs;
+      }
+
+      function addBarcodeResult(pageNumber, info) {
+        state.barcodes.push({ pageNumber, ...info });
+        const item = document.createElement("li");
+        const formatLabel = info.format ? ` (${info.format})` : "";
+        item.textContent = `Page ${pageNumber}: ${info.text}${formatLabel}`;
+        barcodeList.appendChild(item);
+        barcodeSection.hidden = false;
+      }
+
+      function finalizeBarcodeList() {
+        if (!state.barcodeEnabled) {
+          barcodeSection.hidden = true;
+          return;
+        }
+        if (!state.barcodes.length) {
+          barcodeList.innerHTML = "<li>No barcodes detected.</li>";
+          barcodeSection.hidden = false;
+        }
+      }
+
+      function extractResultPoints(result) {
+        if (!result) {
+          return [];
+        }
+        if (typeof result.getResultPoints === "function") {
+          return result.getResultPoints() || [];
+        }
+        return result.resultPoints || [];
+      }
+
+      function getBarcodeBounds(result, canvas) {
+        const points = extractResultPoints(result);
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        points.forEach((point) => {
+          const x = typeof point.getX === "function" ? point.getX() : point.x;
+          const y = typeof point.getY === "function" ? point.getY() : point.y;
+          if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return;
+          }
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        });
+        if (!Number.isFinite(minX)) {
+          return null;
+        }
+        const padding = 6;
+        const x = clamp(minX - padding, 0, canvas.width - 1);
+        const y = clamp(minY - padding, 0, canvas.height - 1);
+        const width = clamp(
+          maxX - minX + padding * 2,
+          12,
+          canvas.width - x
+        );
+        const height = clamp(
+          maxY - minY + padding * 2,
+          12,
+          canvas.height - y
+        );
+        return { x, y, width, height };
+      }
+
+      async function detectBarcodesOnPage(pageView, pageNumber, loadId) {
+        if (!state.barcodeEnabled || !window.ZXing) {
+          return;
+        }
+        if (!state.barcodeReader) {
+          state.barcodeReader = new window.ZXing.BrowserMultiFormatReader();
+        }
+        const reader = state.barcodeReader;
+        let results = [];
+        try {
+          setStatus(`Scanning barcodes on page ${pageNumber}...`);
+          if (typeof reader.decodeMultipleFromCanvas === "function") {
+            results = await reader.decodeMultipleFromCanvas(pageView.canvas);
+          } else if (typeof reader.decodeFromCanvas === "function") {
+            const single = await reader.decodeFromCanvas(pageView.canvas);
+            if (single) {
+              results = [single];
+            }
+          }
+        } catch (error) {
+          if (
+            error &&
+            (error.name === "NotFoundException" ||
+              String(error).includes("NotFoundException"))
+          ) {
+            return;
+          }
+          console.warn("Barcode detection failed:", error);
+          return;
+        }
+
+        if (state.loadId !== loadId) {
+          return;
+        }
+
+        results.forEach((result) => {
+          const text =
+            typeof result.getText === "function"
+              ? result.getText()
+              : result.text || "Unknown";
+          const format =
+            typeof result.getBarcodeFormat === "function"
+              ? String(result.getBarcodeFormat())
+              : result.format || "";
+          addBarcodeResult(pageNumber, { text, format });
+          const bounds = getBarcodeBounds(result, pageView.canvas);
+          if (bounds) {
+            const box = document.createElement("div");
+            box.className = "barcode-box";
+            box.style.left = `${bounds.x}px`;
+            box.style.top = `${bounds.y}px`;
+            box.style.width = `${bounds.width}px`;
+            box.style.height = `${bounds.height}px`;
+            const label = document.createElement("div");
+            label.className = "barcode-label";
+            label.textContent = text;
+            box.appendChild(label);
+            pageView.barcodeLayer.appendChild(box);
+          }
+        });
+      }
+
+      async function renderPage(pageNumber, loadId) {
         const page = await state.pdf.getPage(pageNumber);
         const viewport = page.getViewport({ scale: state.scale });
 
@@ -402,26 +897,65 @@
         textLayer.style.height = `${viewport.height}px`;
         pageInner.appendChild(textLayer);
 
+        const barcodeLayer = document.createElement("div");
+        barcodeLayer.className = "barcode-layer";
+        barcodeLayer.style.width = `${viewport.width}px`;
+        barcodeLayer.style.height = `${viewport.height}px`;
+        pageInner.appendChild(barcodeLayer);
+
         pageWrapper.appendChild(pageInner);
         pagesContainer.appendChild(pageWrapper);
 
-        const context = canvas.getContext("2d");
+        const context = canvas.getContext("2d", { willReadFrequently: true });
         await page.render({ canvasContext: context, viewport }).promise;
 
         const textContent = await page.getTextContent();
         const textDivs = [];
-        const textLayerTask = pdfjsLib.renderTextLayer({
-          textContent,
-          container: textLayer,
-          viewport,
-          textDivs,
-          enhanceTextSelection: false,
-        });
-        if (textLayerTask && textLayerTask.promise) {
-          await textLayerTask.promise;
+        const textItemCount = textContent.items ? textContent.items.length : 0;
+        const minTextItems = 8;
+        const useOcrOnly =
+          state.ocrMode === "always" ||
+          (state.ocrMode === "auto" && textItemCount < minTextItems);
+        const shouldRenderPdfText = textItemCount > 0 && !useOcrOnly;
+        const shouldOcr =
+          state.ocrMode !== "off" &&
+          (state.ocrMode === "always" ||
+            (state.ocrMode === "auto" && textItemCount < minTextItems));
+
+        if (shouldRenderPdfText) {
+          const textLayerTask = pdfjsLib.renderTextLayer({
+            textContent,
+            container: textLayer,
+            viewport,
+            textDivs,
+            enhanceTextSelection: false,
+          });
+          if (textLayerTask && textLayerTask.promise) {
+            await textLayerTask.promise;
+          }
+          textDivs.forEach((div) => {
+            div.dataset.source = "pdf";
+            setupEditable(div);
+          });
         }
 
-        textDivs.forEach((div) => setupEditable(div));
+        const pageView = {
+          pageNumber,
+          canvas,
+          baseCtx: context,
+          textLayer,
+          barcodeLayer,
+          textDivs,
+        };
+
+        if (shouldOcr) {
+          const ocrDivs = await runOcrOnPage(pageView, pageNumber, loadId);
+          textDivs.push(...ocrDivs);
+        }
+
+        if (state.barcodeEnabled) {
+          await detectBarcodesOnPage(pageView, pageNumber, loadId);
+        }
 
         pageInner.addEventListener("click", (event) => {
           if (!state.addMode) {
@@ -437,30 +971,45 @@
           textDivs.push(newDiv);
         });
 
-        state.pages.push({
-          pageNumber,
-          canvas,
-          textLayer,
-          textDivs,
-        });
+        state.pages.push(pageView);
       }
 
       async function loadPdf(file) {
+        state.loadId += 1;
+        const loadId = state.loadId;
         resetEditor();
-        state.fileName = file.name.replace(/\.pdf$/i, "") + "-edited.pdf";
-        setStatus("Loading PDF...");
-        const data = await file.arrayBuffer();
-        state.pdf = await pdfjsLib.getDocument({ data }).promise;
+        syncSettings();
+        setBusy(true);
+        try {
+          state.fileName = file.name.replace(/\.pdf$/i, "") + "-rebuilt.pdf";
+          setStatus("Loading PDF...");
+          const data = await file.arrayBuffer();
+          state.pdf = await pdfjsLib.getDocument({ data }).promise;
 
-        for (let pageNumber = 1; pageNumber <= state.pdf.numPages; pageNumber++) {
-          await renderPage(pageNumber);
-          setStatus(
-            `Loaded ${pageNumber} of ${state.pdf.numPages} page(s)...`
-          );
+          for (
+            let pageNumber = 1;
+            pageNumber <= state.pdf.numPages;
+            pageNumber++
+          ) {
+            if (loadId !== state.loadId) {
+              return;
+            }
+            setStatus(
+              `Rebuilding page ${pageNumber} of ${state.pdf.numPages}...`
+            );
+            await renderPage(pageNumber, loadId);
+          }
+
+          if (loadId !== state.loadId) {
+            return;
+          }
+          finalizeBarcodeList();
+          setStatus("Ready. Click text to edit or use Add Text.");
+        } finally {
+          if (loadId === state.loadId) {
+            setBusy(false);
+          }
         }
-
-        setButtons();
-        setStatus("Ready. Click text to edit or use Add Text.");
       }
 
       function applyEditsToCanvas(pageView) {
@@ -469,42 +1018,64 @@
         output.width = baseCanvas.width;
         output.height = baseCanvas.height;
         const ctx = output.getContext("2d");
+        const baseCtx = pageView.baseCtx || baseCanvas.getContext("2d");
         ctx.drawImage(baseCanvas, 0, 0);
 
         const layerRect = pageView.textLayer.getBoundingClientRect();
         pageView.textDivs.forEach((div) => {
           const isNew = div.dataset.isNew === "true";
           const isEdited = div.dataset.edited === "true";
-          if (!isEdited && !isNew) {
-            return;
-          }
-          const text = (div.textContent || "").trim();
-          if (!text) {
+          const shouldRewrite = state.rewriteAll || isEdited || isNew;
+          if (!shouldRewrite) {
             return;
           }
 
-          const rect = div.getBoundingClientRect();
-          const x = rect.left - layerRect.left;
-          const y = rect.top - layerRect.top;
-          const width = rect.width;
-          const height = rect.height;
+          const rect = getRelativeRect(div, layerRect);
+          if (!isNew) {
+            const bgColor = sampleBackgroundColor(baseCtx, rect, baseCanvas);
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+          }
+
+          const rawText = div.textContent || "";
+          const text = rawText.replace(/\u00a0/g, " ");
+          if (!text.trim()) {
+            return;
+          }
+
           const style = window.getComputedStyle(div);
-          const fontSize = parseFloat(style.fontSize) || 16;
+          const fontSize = parseFloat(style.fontSize) || rect.height || 16;
           const fontFamily =
             style.fontFamily || "Helvetica, Arial, sans-serif";
+          const fontWeight = style.fontWeight || "normal";
+          const fontStyle = style.fontStyle || "normal";
+          const textColor = normalizeColor(
+            div.dataset.originalColor || style.color
+          );
+          const lineHeight = getLineHeight(style, fontSize);
+          const origin = getElementOrigin(div, layerRect);
+          const matrix = parseTransform(style.transform);
 
-          if (!isNew) {
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(x, y, width, height);
+          ctx.save();
+          ctx.translate(origin.x, origin.y);
+          if (matrix) {
+            ctx.transform(
+              matrix.a,
+              matrix.b,
+              matrix.c,
+              matrix.d,
+              matrix.e,
+              matrix.f
+            );
           }
-
-          ctx.fillStyle = "#111111";
+          ctx.fillStyle = textColor;
           ctx.textBaseline = "top";
-          ctx.font = `${fontSize}px ${fontFamily}`;
+          ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
           const lines = text.split(/\n/);
           lines.forEach((line, index) => {
-            ctx.fillText(line, x, y + index * fontSize * 1.2);
+            ctx.fillText(line, 0, index * lineHeight);
           });
+          ctx.restore();
         });
 
         return output;
@@ -520,7 +1091,12 @@
           const { PDFDocument } = PDFLib;
           const outPdf = await PDFDocument.create();
 
+          let pageIndex = 0;
           for (const pageView of state.pages) {
+            pageIndex += 1;
+            setStatus(
+              `Rebuilding PDF page ${pageIndex} of ${state.pages.length}...`
+            );
             const imageCanvas = applyEditsToCanvas(pageView);
             const pngData = imageCanvas.toDataURL("image/png");
             const pngImage = await outPdf.embedPng(pngData);
@@ -546,10 +1122,10 @@
           link.click();
           link.remove();
           URL.revokeObjectURL(url);
-          setStatus("Download ready. Your edited PDF was saved.");
+          setStatus("Download ready. Your rebuilt PDF was saved.");
         } catch (error) {
           console.error(error);
-          setStatus("Failed to build edited PDF.", true);
+          setStatus("Failed to build rebuilt PDF.", true);
         } finally {
           downloadBtn.disabled = false;
         }
@@ -566,9 +1142,35 @@
         });
       });
 
+      ocrModeSelect.addEventListener("change", () => {
+        syncSettings();
+        if (state.pages.length) {
+          setStatus("OCR mode updated. Reload the PDF to apply.");
+        }
+      });
+
+      barcodeToggle.addEventListener("change", () => {
+        syncSettings();
+        if (state.pages.length) {
+          setStatus("Barcode detection updated. Reload the PDF to apply.");
+        }
+      });
+
+      rewriteToggle.addEventListener("change", () => {
+        syncSettings();
+        if (state.pages.length) {
+          setStatus("Rewrite mode updated. Download to apply.");
+        }
+      });
+
       addTextBtn.addEventListener("click", toggleAddMode);
-      clearBtn.addEventListener("click", resetEditor);
+      clearBtn.addEventListener("click", () => {
+        state.loadId += 1;
+        resetEditor();
+      });
       downloadBtn.addEventListener("click", downloadEditedPdf);
+
+      syncSettings();
     </script>
   </body>
 </html>
