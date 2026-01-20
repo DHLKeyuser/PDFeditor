@@ -1,1 +1,574 @@
-.
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <title>Simple PDF Text Editor</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --bg: #f1f5f9;
+        --panel: #ffffff;
+        --border: #e2e8f0;
+        --accent: #2563eb;
+        --accent-soft: #dbeafe;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", "Roboto", "Helvetica Neue", Arial,
+          sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+
+      header {
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .header-content {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .header-content h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+
+      .header-content p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 16px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      }
+
+      .btn,
+      .file-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        background: var(--accent);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease, border 0.2s ease,
+          transform 0.2s ease;
+      }
+
+      .btn.secondary,
+      .file-button {
+        background: var(--panel);
+        color: var(--ink);
+        border-color: var(--border);
+      }
+
+      .btn:disabled,
+      .file-button:has(input:disabled) {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn:focus-visible,
+      .file-button:focus-within {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .file-button input {
+        display: none;
+      }
+
+      .status {
+        margin: 16px 0 0;
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+
+      .status.status-error {
+        border-color: #fecaca;
+        color: #b91c1c;
+        background: #fef2f2;
+      }
+
+      .pages {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .page {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        overflow: auto;
+      }
+
+      .page-inner {
+        position: relative;
+        display: inline-block;
+      }
+
+      .page-canvas {
+        display: block;
+        background: #ffffff;
+      }
+
+      .text-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .text-layer span {
+        position: absolute;
+        white-space: pre;
+        transform-origin: 0% 0%;
+        pointer-events: auto;
+      }
+
+      .editable-text {
+        color: transparent;
+        cursor: text;
+        outline: none;
+      }
+
+      .editable-text:hover {
+        color: #0f172a;
+        background: rgba(219, 234, 254, 0.6);
+      }
+
+      .editable-text:focus,
+      .editable-text.edited {
+        color: #0f172a;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.6);
+      }
+
+      .notes {
+        margin-top: 24px;
+        padding: 16px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      .notes h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+
+      .notes ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .notes li {
+        margin-bottom: 6px;
+      }
+
+      @media (max-width: 720px) {
+        .controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .btn,
+        .file-button {
+          justify-content: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-content">
+        <h1>PDF Text Editor</h1>
+        <p>Upload a PDF, edit its text, and download a new copy.</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="controls">
+        <label class="file-button" for="fileInput">
+          Select PDF
+          <input id="fileInput" type="file" accept="application/pdf" />
+        </label>
+        <button
+          class="btn secondary"
+          type="button"
+          id="addTextBtn"
+          aria-pressed="false"
+          disabled
+        >
+          Add Text
+        </button>
+        <button class="btn" type="button" id="downloadBtn" disabled>
+          Download Edited PDF
+        </button>
+        <button class="btn secondary" type="button" id="clearBtn" disabled>
+          Clear
+        </button>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite">
+        Upload a PDF to begin.
+      </p>
+
+      <section id="pages" class="pages" aria-live="polite"></section>
+
+      <section class="notes">
+        <h2>Tips</h2>
+        <ul>
+          <li>Click on any text to edit it. Press Enter to save.</li>
+          <li>Use Add Text to place new text on a page.</li>
+          <li>Edits are flattened into the downloaded PDF.</li>
+          <li>Scanned PDFs (images) cannot be edited.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@latest/legacy/build/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@latest/dist/pdf-lib.min.js"></script>
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const pagesContainer = document.getElementById("pages");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const addTextBtn = document.getElementById("addTextBtn");
+      const statusEl = document.getElementById("status");
+
+      const workerSrc =
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@latest/legacy/build/pdf.worker.min.js";
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+      const state = {
+        pdf: null,
+        pages: [],
+        fileName: "edited.pdf",
+        addMode: false,
+        scale: 1.4,
+      };
+
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.classList.toggle("status-error", isError);
+      }
+
+      function setButtons() {
+        const hasPdf = state.pages.length > 0;
+        downloadBtn.disabled = !hasPdf;
+        clearBtn.disabled = !hasPdf;
+        addTextBtn.disabled = !hasPdf;
+      }
+
+      function resetEditor() {
+        pagesContainer.innerHTML = "";
+        state.pdf = null;
+        state.pages = [];
+        state.fileName = "edited.pdf";
+        state.addMode = false;
+        addTextBtn.textContent = "Add Text";
+        addTextBtn.setAttribute("aria-pressed", "false");
+        fileInput.value = "";
+        setButtons();
+        setStatus("Upload a PDF to begin.");
+      }
+
+      function toggleAddMode() {
+        state.addMode = !state.addMode;
+        addTextBtn.setAttribute("aria-pressed", String(state.addMode));
+        addTextBtn.textContent = state.addMode ? "Exit Add Text" : "Add Text";
+        if (state.addMode) {
+          setStatus("Add Text mode: click on a page to insert text.");
+        } else {
+          setStatus("Ready. Click text to edit or use Add Text.");
+        }
+      }
+
+      function updateEditedState(div) {
+        const isNew = div.dataset.isNew === "true";
+        const original = div.dataset.originalText || "";
+        const current = div.textContent || "";
+        const edited = isNew ? current.trim().length > 0 : current !== original;
+        div.dataset.edited = edited ? "true" : "false";
+        div.classList.toggle("edited", edited);
+      }
+
+      function setupEditable(div) {
+        div.classList.add("editable-text");
+        div.contentEditable = "true";
+        div.spellcheck = false;
+        div.dataset.originalText = div.textContent || "";
+        div.dataset.edited = "false";
+        div.addEventListener("input", () => updateEditedState(div));
+        div.addEventListener("blur", () => updateEditedState(div));
+        div.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            div.blur();
+          }
+        });
+      }
+
+      function selectAllText(element) {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      function createNewText(textLayer, x, y) {
+        const div = document.createElement("span");
+        div.textContent = "New text";
+        div.style.left = `${x}px`;
+        div.style.top = `${y}px`;
+        div.style.fontSize = "16px";
+        div.style.fontFamily = "Helvetica, Arial, sans-serif";
+        div.dataset.originalText = "";
+        div.dataset.edited = "true";
+        div.dataset.isNew = "true";
+        setupEditable(div);
+        div.classList.add("edited");
+        textLayer.appendChild(div);
+        requestAnimationFrame(() => {
+          div.focus();
+          selectAllText(div);
+        });
+        return div;
+      }
+
+      async function renderPage(pageNumber) {
+        const page = await state.pdf.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: state.scale });
+
+        const pageWrapper = document.createElement("div");
+        pageWrapper.className = "page";
+
+        const pageInner = document.createElement("div");
+        pageInner.className = "page-inner";
+        pageInner.style.width = `${viewport.width}px`;
+        pageInner.style.height = `${viewport.height}px`;
+
+        const canvas = document.createElement("canvas");
+        canvas.className = "page-canvas";
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        pageInner.appendChild(canvas);
+
+        const textLayer = document.createElement("div");
+        textLayer.className = "text-layer";
+        textLayer.style.width = `${viewport.width}px`;
+        textLayer.style.height = `${viewport.height}px`;
+        pageInner.appendChild(textLayer);
+
+        pageWrapper.appendChild(pageInner);
+        pagesContainer.appendChild(pageWrapper);
+
+        const context = canvas.getContext("2d");
+        await page.render({ canvasContext: context, viewport }).promise;
+
+        const textContent = await page.getTextContent();
+        const textDivs = [];
+        const textLayerTask = pdfjsLib.renderTextLayer({
+          textContent,
+          container: textLayer,
+          viewport,
+          textDivs,
+          enhanceTextSelection: false,
+        });
+        if (textLayerTask && textLayerTask.promise) {
+          await textLayerTask.promise;
+        }
+
+        textDivs.forEach((div) => setupEditable(div));
+
+        pageInner.addEventListener("click", (event) => {
+          if (!state.addMode) {
+            return;
+          }
+          if (event.target.closest(".editable-text")) {
+            return;
+          }
+          const rect = textLayer.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          const newDiv = createNewText(textLayer, x, y);
+          textDivs.push(newDiv);
+        });
+
+        state.pages.push({
+          pageNumber,
+          canvas,
+          textLayer,
+          textDivs,
+        });
+      }
+
+      async function loadPdf(file) {
+        resetEditor();
+        state.fileName = file.name.replace(/\.pdf$/i, "") + "-edited.pdf";
+        setStatus("Loading PDF...");
+        const data = await file.arrayBuffer();
+        state.pdf = await pdfjsLib.getDocument({ data }).promise;
+
+        for (let pageNumber = 1; pageNumber <= state.pdf.numPages; pageNumber++) {
+          await renderPage(pageNumber);
+          setStatus(
+            `Loaded ${pageNumber} of ${state.pdf.numPages} page(s)...`
+          );
+        }
+
+        setButtons();
+        setStatus("Ready. Click text to edit or use Add Text.");
+      }
+
+      function applyEditsToCanvas(pageView) {
+        const baseCanvas = pageView.canvas;
+        const output = document.createElement("canvas");
+        output.width = baseCanvas.width;
+        output.height = baseCanvas.height;
+        const ctx = output.getContext("2d");
+        ctx.drawImage(baseCanvas, 0, 0);
+
+        const layerRect = pageView.textLayer.getBoundingClientRect();
+        pageView.textDivs.forEach((div) => {
+          const isNew = div.dataset.isNew === "true";
+          const isEdited = div.dataset.edited === "true";
+          if (!isEdited && !isNew) {
+            return;
+          }
+          const text = (div.textContent || "").trim();
+          if (!text) {
+            return;
+          }
+
+          const rect = div.getBoundingClientRect();
+          const x = rect.left - layerRect.left;
+          const y = rect.top - layerRect.top;
+          const width = rect.width;
+          const height = rect.height;
+          const style = window.getComputedStyle(div);
+          const fontSize = parseFloat(style.fontSize) || 16;
+          const fontFamily =
+            style.fontFamily || "Helvetica, Arial, sans-serif";
+
+          if (!isNew) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(x, y, width, height);
+          }
+
+          ctx.fillStyle = "#111111";
+          ctx.textBaseline = "top";
+          ctx.font = `${fontSize}px ${fontFamily}`;
+          const lines = text.split(/\n/);
+          lines.forEach((line, index) => {
+            ctx.fillText(line, x, y + index * fontSize * 1.2);
+          });
+        });
+
+        return output;
+      }
+
+      async function downloadEditedPdf() {
+        if (!state.pages.length) {
+          return;
+        }
+        downloadBtn.disabled = true;
+        setStatus("Preparing download...");
+        try {
+          const { PDFDocument } = PDFLib;
+          const outPdf = await PDFDocument.create();
+
+          for (const pageView of state.pages) {
+            const imageCanvas = applyEditsToCanvas(pageView);
+            const pngData = imageCanvas.toDataURL("image/png");
+            const pngImage = await outPdf.embedPng(pngData);
+            const page = outPdf.addPage([
+              imageCanvas.width,
+              imageCanvas.height,
+            ]);
+            page.drawImage(pngImage, {
+              x: 0,
+              y: 0,
+              width: imageCanvas.width,
+              height: imageCanvas.height,
+            });
+          }
+
+          const pdfBytes = await outPdf.save();
+          const blob = new Blob([pdfBytes], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = state.fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          setStatus("Download ready. Your edited PDF was saved.");
+        } catch (error) {
+          console.error(error);
+          setStatus("Failed to build edited PDF.", true);
+        } finally {
+          downloadBtn.disabled = false;
+        }
+      }
+
+      fileInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+          return;
+        }
+        loadPdf(file).catch((error) => {
+          console.error(error);
+          setStatus("Failed to load PDF. Try another file.", true);
+        });
+      });
+
+      addTextBtn.addEventListener("click", toggleAddMode);
+      clearBtn.addEventListener("click", resetEditor);
+      downloadBtn.addEventListener("click", downloadEditedPdf);
+    </script>
+  </body>
+</html>
